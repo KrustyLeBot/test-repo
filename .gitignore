@@ -1,0 +1,5 @@
+channels.txt
+subscriptions.csv
+node_modules/
+.wrangler/
+.dev.vars

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
+ <title>Chaîne &amp; Test</title>
+ <author><name>Chaîne &amp; Test</name><uri>https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx</uri></author>
+ <entry>
+  <id>yt:video:dQw4w9WgXcQ</id><yt:videoId>dQw4w9WgXcQ</yt:videoId>
+  <title>Vidéo normale &quot;test&quot;</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"/>
+  <published>2026-10-24T10:00:00+00:00</published>
+ </entry>
+ <entry>
+  <id>yt:video:abcdefghijk</id><yt:videoId>abcdefghijk</yt:videoId>
+  <title>Un short</title>
+  <link rel="alternate" href="https://www.youtube.com/shorts/abcdefghijk"/>
+  <published>2026-10-23T10:00:00+00:00</published>
+ </entry>
+</feed>
