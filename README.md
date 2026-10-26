@@ -96,7 +96,3 @@ The schedule is the `cron:` line in `.github/workflows/refresh.yml` (GitHub acce
 ## Renaming the repo
 
 GitHub redirects the old name. If Cloudflare stops deploying after a rename, reconnect the repo in Worker → Settings → Build. GitHub secrets stay in place. The Worker name (`wrangler.toml`) determines the `workers.dev` URL: do not change it without reinstalling the addon.
-
-## Files from the initial test
-
-`manifest.json`, `catalog/`, `meta/`, `stream/` at the root and `.nojekyll` are the static addon that validated `ytId` playback in Nuvio through GitHub Pages. They are no longer used and can be deleted once Pages is disabled.
