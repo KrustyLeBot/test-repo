@@ -44,7 +44,7 @@ const channelMeta = (c) => ({
   releaseInfo: c.latest.slice(0, 10),
 });
 
-// Une seule saison ; épisode 1 = vidéo la plus récente. `released` garde la vraie date de publication.
+// Single season; episode 1 = most recent video. `released` keeps the real publish date.
 function episodes(vids) {
   return [...vids]
     .sort((a, b) => b.published.localeCompare(a.published))

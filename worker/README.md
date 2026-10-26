@@ -1,3 +1,3 @@
-Voir le [README du repo](../README.md).
+See the [repo README](../README.md).
 
-Test du parsing : `node worker/test/parse.test.mjs`
+Parsing test: `node worker/test/parse.test.mjs`

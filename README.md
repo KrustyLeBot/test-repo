@@ -1,94 +1,102 @@
-# Addon Nuvio « Mes abonnements YouTube »
+# Nuvio addon: "My YouTube subscriptions"
 
-Affiche dans Nuvio (Stremio-compatible) les dernières vidéos de mes chaînes YouTube : pas de recommandations, pas de serveur à héberger, liste des abonnements privée.
+Shows the latest videos of my YouTube channels in Nuvio (Stremio-compatible): no recommendations, no server to host, subscription list kept private.
 
-## Fonctionnement
+## How it works
 
 ```
-GitHub Action (toutes les 30 min)          Cloudflare Worker (gratuit)            Nuvio
-  lit les flux RSS des chaînes      ──►   lit le KV et sert l'addon     ◄──   /<TOKEN>/manifest.json
-  filtre les Shorts                       (catalogue, meta, stream ytId)
-  écrit le résultat dans le KV
+GitHub Action (every 30 min)               Cloudflare Worker (free)               Nuvio
+  reads the channels' RSS feeds     ──►   reads the KV and serves the addon  ◄──   /<TOKEN>/manifest.json
+  filters out Shorts                      (catalog, meta, stream with ytId)
+  writes the result to the KV
 ```
 
-- `worker/src/index.js` : le Worker. Lecture seule du KV, 404 si le token de l'URL est faux.
-- `worker/src/parse.js` : parsing des flux RSS YouTube.
-- `worker/scripts/refresh.mjs` : script lancé par l'Action (flux RSS, détection des Shorts, écriture dans le KV).
-- `.github/workflows/refresh.yml` : planification de l'Action.
-- `worker/test/` : test du parsing (`node worker/test/parse.test.mjs`).
+- `worker/src/index.js`: the Worker. Read-only on the KV, returns 404 if the token in the URL is wrong.
+- `worker/src/parse.js`: YouTube RSS feed parsing.
+- `worker/scripts/refresh.mjs`: script run by the Action (RSS feeds, Shorts detection, KV writes).
+- `.github/workflows/refresh.yml`: Action schedule.
+- `worker/test/`: parsing test (`node worker/test/parse.test.mjs`).
 
-Deux catalogues :
-- **Dernières vidéos** (type `movie`) : les 200 dernières vidéos, toutes chaînes confondues.
-- **Chaînes** (type `series`) : une « série » par chaîne, triée par dernière publication. Les « épisodes » sont les vidéos de la chaîne : une seule saison, l'épisode 1 est la vidéo la plus récente (la vraie date de publication reste dans `released`).
+Two catalogs:
+- **Latest videos** (type `movie`): the 200 latest videos across all channels.
+- **Channels** (type `series`): one "series" per channel, sorted by latest upload. The "episodes" are the channel's videos: a single season, episode 1 is the most recent video (the real publish date stays in `released`).
 
-IDs : `yt_<videoId>` pour une vidéo, `ytch_<channelId>` pour une chaîne. Streams renvoyés : `ytId` (lecture dans Nuvio) et `externalUrl` (YouTube / NewPipe).
+IDs: `yt_<videoId>` for a video, `ytch_<channelId>` for a channel. Returned streams: `ytId` (plays in Nuvio) and `externalUrl` (YouTube / NewPipe).
 
-Chaque chaîne garde ses 15 dernières vidéos (ce que donne le flux RSS), Shorts compris avant filtrage.
+Each channel keeps its 15 latest videos (what the RSS feed provides), Shorts included before filtering.
 
-Clés KV : `videos`, `channels`, `ch:<id>`. L'Action n'écrit que les clés qui ont changé (limite gratuite : 1 000 écritures/jour).
+KV keys: `videos`, `channels`, `resolved`, `config`, `ch:<id>`. The Action only writes the keys that changed (free tier limit: 1,000 writes/day).
 
-## Confidentialité
+## Privacy
 
-Le repo est public, donc rien de personnel ne doit y figurer :
+The repo is public, so nothing personal may appear in it:
 
-| Donnée | Où elle est |
+| Data | Where it lives |
 |---|---|
-| Liste des chaînes (`CHANNELS`) | secret GitHub Actions |
-| Accès au KV (`CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`) | secrets GitHub Actions |
-| Token de l'URL de l'addon (`TOKEN`) | secret du Worker Cloudflare |
-| Vidéos récupérées | KV Cloudflare (privé) |
+| Channel list | KV key `config` (or `CHANNELS` GitHub secret) |
+| KV access (`CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`) | GitHub Actions secrets |
+| Addon URL token (`TOKEN`) | Cloudflare Worker secret |
+| Fetched videos | Cloudflare KV (private) |
 
-Les handles et liens sont aussi dans le secret `CHANNELS`. Les logs de l'Action sont publics : le script n'y écrit que des totaux et masque les IDs de chaînes. N'y ajoute jamais de `console.log` d'ID ou de titre.
+Action logs are public: the script only prints totals and masks channel IDs, handles and links. Never add a `console.log` of an ID, handle or title.
 
-## Installation
+## Setup
 
 ### 1. Cloudflare
-1. Créer un compte sur dash.cloudflare.com (plan Free).
-2. Workers & Pages → Create → Import a repository → ce repo.
-3. Project name `yt-subs-addon`, branche `main`, Root directory `worker`, puis Save and Deploy.
-4. Worker → Settings → Variables and Secrets → ajouter un **Secret** `TOKEN` (24 lettres/chiffres aléatoires, à noter).
-5. Vérifier dans Settings → Bindings que `KV` est lié à un namespace (sinon : le créer dans Storage & Databases → KV puis l'ajouter en binding `KV`).
+1. Create an account at dash.cloudflare.com (Free plan).
+2. Workers & Pages → Create → Import a repository → this repo.
+3. Project name `yt-subs-addon`, branch `main`, Root directory `worker`, then Save and Deploy.
+4. Worker → Settings → Variables and Secrets → add a **Secret** `TOKEN` (24 random letters/digits, keep a copy). This is the runtime section, not "Build variables".
+5. In Settings → Bindings, check that `KV` is bound to a namespace (otherwise create one under Storage & Databases → KV and add it as binding `KV`).
 
 ### 2. GitHub
-Settings → Secrets and variables → Actions → New repository secret :
+Settings → Secrets and variables → Actions → New repository secret:
 
-| Nom | Valeur |
+| Name | Value |
 |---|---|
-| `CHANNELS` (optionnel si la clé KV `config` existe) | chaînes séparées par des virgules ou des retours à la ligne : `@handle`, lien de chaîne (`https://www.youtube.com/@nom`) ou ID `UC...`. Les handles et liens sont convertis en ID par l'Action (résultat mis en cache dans le KV) |
-| `CF_ACCOUNT_ID` | Workers & Pages, colonne de droite |
-| `CF_KV_NAMESPACE_ID` | Storage & Databases → KV → ID du namespace |
+| `CF_ACCOUNT_ID` | Workers & Pages, right-hand column |
+| `CF_KV_NAMESPACE_ID` | Storage & Databases → KV → namespace ID |
 | `CF_API_TOKEN` | My Profile → API Tokens → Custom Token, permission *Account → Workers KV Storage → Edit* |
+| `CHANNELS` (optional if the KV key `config` exists) | channel list, see below |
 
-### 3. Premier remplissage
-Onglet Actions → *Refresh YouTube feeds* → Run workflow. Le log doit afficher `N chaînes : N ok, 0 en échec` puis `N vidéos écrites dans le KV`.
+### 3. Channel list
+Create the KV key `config` in the Cloudflare dashboard (Storage & Databases → KV → your namespace → KV Pairs → Add entry). One channel per line (commas and spaces also work). Accepted forms:
+- `@handle`
+- a channel link (`https://www.youtube.com/@name`, `/channel/UC...`)
+- a channel ID `UC...`
 
-### 4. Nuvio
-Installer `https://yt-subs-addon.<compte>.workers.dev/<TOKEN>/manifest.json`.
+The `subscriptions.csv` from Google Takeout (YouTube → subscriptions) can be pasted as is: the header is ignored and only the first column (ID) is read. `@handles` can be appended after it.
 
-## Gérer les chaînes
+Handles and links are converted to IDs by the Action; the result is cached in the KV (`resolved`). `config` takes priority over the `CHANNELS` secret. GitHub secrets are write-only, which is why the KV key is easier to edit.
 
-Le plus simple : la clé KV `config`, lisible et modifiable dans le dashboard Cloudflare (Storage & Databases → KV → ton namespace → KV Pairs → Add entry, clé `config`, valeur = la liste, une chaîne par ligne). Elle est prioritaire sur le secret `CHANNELS`. Les secrets GitHub sont en écriture seule : impossible de relire la liste pour la modifier.
+### 4. First run
+Actions tab → *Refresh YouTube feeds* → Run workflow. The log should show `N entries: N channels, 0 unresolved`, then `N channels: N ok, 0 failed`, then `N videos, N channels, N writes, 0 deletions`. The first run is longer because every video is checked for Shorts.
 
-Le contenu du `subscriptions.csv` de Google Takeout (YouTube → abonnements) peut être collé tel quel dans cette clé : l'en-tête est ignoré et seule la première colonne (ID) est lue. On peut ajouter des `@handles` à la suite.
+### 5. Nuvio
+Install `https://yt-subs-addon.<account>.workers.dev/<TOKEN>/manifest.json`.
 
-Ensuite relancer le workflow à la main ou attendre 30 min. Une chaîne retirée disparaît du catalogue au passage suivant.
+## Managing channels
 
-## Dépannage
+Edit the `config` KV key, then re-run the workflow or wait for the next scheduled run. A removed channel disappears from the catalog on the next run.
 
-| Symptôme | Cause probable |
+## Troubleshooting
+
+| Symptom | Likely cause |
 |---|---|
-| `Secret manquant : XXX` | secret absent ou mal nommé |
-| `HTTP 401/403` sur le KV | token Cloudflare faux ou sans permission *Workers KV Storage: Edit* |
-| `N non résolues` | handle ou lien introuvable (faute de frappe) ou page YouTube bloquée depuis GitHub : utiliser l'ID `UC...` à la place |
-| `0 ok` | YouTube refuse les requêtes depuis GitHub |
-| « Not found » dans le navigateur | token de l'URL différent du secret `TOKEN` |
-| Les Shorts apparaissent | YouTube bloque le test `/shorts/<id>` depuis GitHub |
-| Plus de mise à jour | GitHub désactive les workflows planifiés après 60 jours sans activité sur le repo : les réactiver dans l'onglet Actions |
+| `Missing secret: XXX` | secret missing or misnamed |
+| `HTTP 401/403` on the KV | wrong Cloudflare token, or missing *Workers KV Storage: Edit* permission |
+| `N unresolved` | handle or link not found (typo) or YouTube page blocked from GitHub: use the `UC...` ID instead |
+| `0 ok` | YouTube refuses requests from GitHub |
+| "Not found" in the browser | URL token differs from the `TOKEN` secret, or the secret was set in "Build variables" instead of the runtime section |
+| Shorts show up | YouTube blocks the `/shorts/<id>` probe from GitHub |
+| No more updates | GitHub disables scheduled workflows after 60 days without repo activity: re-enable them in the Actions tab |
 
-## Renommer le repo
+The schedule is the `cron:` line in `.github/workflows/refresh.yml` (GitHub accepts 5 minutes at the minimum and often delays runs by a few minutes).
 
-GitHub redirige l'ancien nom. Si le déploiement Cloudflare ne se déclenche plus après un renommage, reconnecter le repo dans Worker → Settings → Build. Les secrets GitHub restent en place. Le nom du Worker (`wrangler.toml`) fixe l'URL `workers.dev` : ne pas le changer sans réinstaller l'addon.
+## Renaming the repo
 
-## Fichiers du test initial
+GitHub redirects the old name. If Cloudflare stops deploying after a rename, reconnect the repo in Worker → Settings → Build. GitHub secrets stay in place. The Worker name (`wrangler.toml`) determines the `workers.dev` URL: do not change it without reinstalling the addon.
 
-`manifest.json`, `catalog/`, `meta/`, `stream/` à la racine et `.nojekyll` sont l'addon statique qui a servi à valider la lecture `ytId` dans Nuvio via GitHub Pages. Ils ne servent plus et peuvent être supprimés, une fois Pages désactivé.
+## Files from the initial test
+
+`manifest.json`, `catalog/`, `meta/`, `stream/` at the root and `.nojekyll` are the static addon that validated `ytId` playback in Nuvio through GitHub Pages. They are no longer used and can be deleted once Pages is disabled.

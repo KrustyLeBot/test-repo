@@ -1,10 +1,10 @@
-// Lancé par GitHub Actions : lit les flux RSS et pousse le résultat dans le KV Cloudflare.
-// Les IDs de chaînes viennent d'un secret et ne doivent JAMAIS être écrits dans les logs (repo public).
+// Run by GitHub Actions: reads the RSS feeds and pushes the result to the Cloudflare KV.
+// Channel IDs come from private config and must NEVER be written to the logs (public repo).
 //
-// Clés KV :
-//   videos     dernières vidéos toutes chaînes confondues (sans Shorts)
-//   channels   liste des chaînes triée par dernière publication
-//   ch:<id>    historique d'une chaîne (Shorts inclus, marqués isShort)
+// KV keys:
+//   videos     latest videos across all channels (no Shorts)
+//   channels   channel list sorted by latest upload
+//   ch:<id>    one channel's recent videos (Shorts included, flagged isShort)
 import { parse } from "../src/parse.js";
 
 const { CHANNELS, CF_ACCOUNT_ID, CF_KV_NAMESPACE_ID, CF_API_TOKEN } = process.env;
@@ -16,7 +16,7 @@ const MAX_PER_CHANNEL = 15;
 const CONCURRENCY = 10;
 
 for (const [k, v] of Object.entries({ CF_ACCOUNT_ID, CF_KV_NAMESPACE_ID, CF_API_TOKEN })) {
-  if (!v) { console.error(`Secret manquant : ${k}`); process.exit(1); }
+  if (!v) { console.error(`Missing secret: ${k}`); process.exit(1); }
 }
 
 const kvBase = `${CF_API}/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_KV_NAMESPACE_ID}`;
@@ -50,7 +50,7 @@ async function kvList(prefix) {
   return names;
 }
 
-// Pool simple : exécute fn sur chaque élément, CONCURRENCY à la fois
+// Simple pool: runs fn on every item, CONCURRENCY at a time
 async function pool(items, fn) {
   let i = 0;
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
@@ -58,22 +58,22 @@ async function pool(items, fn) {
   }));
 }
 
-// Liste des chaînes : clé KV "config" (modifiable dans le dashboard Cloudflare), sinon secret CHANNELS.
-// Accepte, séparés par virgules / espaces / retours à la ligne : des IDs (UC...), des @handles,
-// ou des liens de chaînes (youtube.com/@nom, /channel/UC..., /c/nom, /user/nom).
-// Le CSV de Google Takeout (subscriptions.csv) peut être collé tel quel : on prend la 1re colonne (ID).
+// Channel list: KV key "config" (editable in the Cloudflare dashboard), otherwise the CHANNELS secret.
+// Accepts, separated by commas / spaces / newlines: IDs (UC...), @handles,
+// or channel links (youtube.com/@name, /channel/UC..., /c/name, /user/name).
+// A Google Takeout subscriptions.csv can be pasted as is: only the first column (ID) is used.
 const entries = ((await kvGet("config")) ?? CHANNELS ?? "")
   .split(/\r?\n/)
   .flatMap((line) => {
-    if (/^\s*channel[ _]?id\b/i.test(line)) return []; // ligne d'en-tête du CSV
+    if (/^\s*channel[ _]?id\b/i.test(line)) return []; // CSV header line
     const first = line.split(",")[0].trim();
     if (/^UC[\w-]{22}$/.test(first)) return [first];
     return line.split(/[,\s]+/).filter(Boolean);
   });
-if (!entries.length) { console.error("Aucune chaîne : créer la clé KV « config » ou le secret CHANNELS."); process.exit(1); }
+if (!entries.length) { console.error("No channels: create the \"config\" KV key or the CHANNELS secret."); process.exit(1); }
 for (const e of entries) console.log(`::add-mask::${e}`);
 
-// --- Résolution des handles / liens en IDs de chaînes (résultat mis en cache dans la clé KV "resolved") ---
+// --- Resolve handles / links to channel IDs (cached in the "resolved" KV key) ---
 const YT_BASE = process.env.YT_BASE || "https://www.youtube.com";
 const ID_ONLY = /^UC[\w-]{22}$/;
 
@@ -115,31 +115,31 @@ await pool(entries, async (e) => {
     if (!id) throw new Error("ID introuvable");
     resolved[e] = id;
   } catch {
-    unresolved++; // jamais d'entrée dans les logs : repo public
+    unresolved++; // never log the entry: public repo
   }
 });
-const channels = [...new Set(entries.map((e) => resolved[e]).filter(Boolean))]; // ordre stable
+const channels = [...new Set(entries.map((e) => resolved[e]).filter(Boolean))]; // stable order
 for (const id of channels) console.log(`::add-mask::${id}`);
-console.log(`${entries.length} entrées : ${channels.length} chaînes, ${unresolved} non résolues`);
+console.log(`${entries.length} entries: ${channels.length} channels, ${unresolved} unresolved`);
 if (JSON.stringify(entries.filter((e) => resolved[e]).map((e) => [e, resolved[e]])) !== JSON.stringify(Object.entries(resolvedBefore))) await kvPut("resolved", JSON.stringify(Object.fromEntries(entries.filter((e) => resolved[e]).map((e) => [e, resolved[e]]))));
 
-// État actuel du KV : clé -> texte JSON (sert à ne réécrire que ce qui change)
+// Current KV state: key -> JSON text (used to rewrite only what changed)
 const current = {};
 await pool(await kvList("ch:"), async (key) => { current[key] = await kvGet(key); });
 
-const history = {};   // channelId -> vidéos (anciennes + nouvelles)
-const names = {};     // channelId -> nom de la chaîne
-const known = new Map(); // videoId -> isShort déjà connu
+const history = {};   // channelId -> videos (old + new)
+const names = {};     // channelId -> channel name
+const known = new Map(); // videoId -> already known isShort
 for (const [key, text] of Object.entries(current)) {
   try {
     const vids = JSON.parse(text);
     history[key.slice(3)] = vids;
     for (const v of vids) if (typeof v.isShort === "boolean") known.set(v.id, v.isShort);
-  } catch { /* clé illisible : ignorée, sera réécrite */ }
+  } catch { /* unreadable key: ignored, will be rewritten */ }
 }
 try {
   for (const c of JSON.parse((await kvGet("channels")) || "[]")) names[c.id] = c.name;
-} catch { /* ignoré */ }
+} catch { /* ignored */ }
 
 let ok = 0, failed = 0;
 await pool(channels, async (id) => {
@@ -152,18 +152,18 @@ await pool(channels, async (id) => {
     const byId = new Map((history[id] || []).map((v) => [v.id, v]));
     for (const v of fresh) {
       const old = byId.get(v.id);
-      byId.set(v.id, { id: v.id, title: v.title, published: v.published, isShort: v.isShort ? true : (old?.isShort ?? known.get(v.id)) }); // undefined = pas encore testée
+      byId.set(v.id, { id: v.id, title: v.title, published: v.published, isShort: v.isShort ? true : (old?.isShort ?? known.get(v.id)) }); // undefined = not tested yet
     }
     history[id] = [...byId.values()]
       .sort((a, b) => b.published.localeCompare(a.published))
       .slice(0, MAX_PER_CHANNEL);
     ok++;
   } catch {
-    failed++; // on garde l'historique existant de cette chaîne
+    failed++; // keep this channel's existing data
   }
 });
 
-// /shorts/<id> répond 200 pour un Short et redirige (3xx) pour une vidéo normale
+// /shorts/<id> answers 200 for a Short and redirects (3xx) for a regular video
 const toCheck = channels.flatMap((id) => (history[id] || []).filter((v) => typeof v.isShort !== "boolean"));
 await pool(toCheck, async (v) => {
   try {
@@ -173,12 +173,12 @@ await pool(toCheck, async (v) => {
     v.isShort = false;
   }
 });
-console.log(`${toCheck.length} vidéos testées pour les Shorts`);
-console.log(`${channels.length} chaînes : ${ok} ok, ${failed} en échec`);
+console.log(`${toCheck.length} videos checked for Shorts`);
+console.log(`${channels.length} channels: ${ok} ok, ${failed} failed`);
 
-if (ok === 0) { console.error("Aucun flux récupéré, KV non modifié."); process.exit(1); }
+if (ok === 0) { console.error("No feed fetched, KV left untouched."); process.exit(1); }
 
-// Données dérivées
+// Derived data
 const latest = [];
 const channelList = [];
 for (const id of channels) {
@@ -193,14 +193,14 @@ latest.sort((a, b) => b.published.localeCompare(a.published) || a.id.localeCompa
 const next = { videos: JSON.stringify(latest.slice(0, MAX_LATEST)), channels: JSON.stringify(channelList) };
 for (const id of channels) if (history[id]) next[`ch:${id}`] = JSON.stringify(history[id]);
 
-// Écritures : seulement ce qui a changé
+// Writes: only what changed
 const previous = { ...current, videos: await kvGet("videos"), channels: await kvGet("channels") };
 const writes = Object.keys(next).filter((k) => previous[k] !== next[k]);
 await pool(writes, (k) => kvPut(k, next[k]));
 
-// Nettoyage : chaînes retirées, ancienne clé byChannel
+// Cleanup: removed channels, legacy byChannel key
 const stale = Object.keys(current).filter((k) => !(k in next));
 if ((await kvGet("byChannel")) !== null) stale.push("byChannel");
 await pool(stale, kvDelete);
 
-console.log(`${latest.length} vidéos, ${channelList.length} chaînes, ${writes.length} écritures, ${stale.length} suppressions`);
+console.log(`${latest.length} videos, ${channelList.length} channels, ${writes.length} writes, ${stale.length} deletions`);
