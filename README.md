@@ -5,7 +5,7 @@ Affiche dans Nuvio (Stremio-compatible) les dernières vidéos de mes chaînes Y
 ## Fonctionnement
 
 ```
-GitHub Action (toutes les 10 min)          Cloudflare Worker (gratuit)            Nuvio
+GitHub Action (toutes les 30 min)          Cloudflare Worker (gratuit)            Nuvio
   lit les flux RSS des chaînes      ──►   lit le KV et sert l'addon     ◄──   /<TOKEN>/manifest.json
   filtre les Shorts                       (catalogue, meta, stream ytId)
   écrit le résultat dans le KV
@@ -71,7 +71,7 @@ Le plus simple : la clé KV `config`, lisible et modifiable dans le dashboard Cl
 
 Le contenu du `subscriptions.csv` de Google Takeout (YouTube → abonnements) peut être collé tel quel dans cette clé : l'en-tête est ignoré et seule la première colonne (ID) est lue. On peut ajouter des `@handles` à la suite.
 
-Ensuite relancer le workflow à la main ou attendre 10 min. Une chaîne retirée disparaît du catalogue au passage suivant.
+Ensuite relancer le workflow à la main ou attendre 30 min. Une chaîne retirée disparaît du catalogue au passage suivant.
 
 ## Dépannage
 
