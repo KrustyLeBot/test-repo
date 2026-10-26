@@ -1,8 +1,3 @@
-import { parse } from "./parse.js";
-
-const FEED = (id) => `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
-const MAX_VIDEOS = 200;
-
 const MANIFEST = {
   id: "perso.ytsubs",
   version: "0.1.0",
@@ -32,9 +27,6 @@ const toMeta = (v) => ({
   description: `${v.channel} — ${v.published.slice(0, 10)}`,
   releaseInfo: v.published.slice(0, 10),
 });
-
-const listChannels = (env) =>
-  (env.CHANNELS || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
 
 export default {
   async fetch(req, env) {
@@ -69,30 +61,5 @@ export default {
     }
 
     return new Response("Not found", { status: 404 });
-  },
-
-  async scheduled(event, env) {
-    const channels = listChannels(env);
-    const half = Math.floor(Date.now() / 1_800_000) % 2;
-    const batch = channels.filter((_, i) => i % 2 === half);
-
-    const results = await Promise.allSettled(
-      batch.map((id) => fetch(FEED(id)).then((r) => r.text()).then((x) => parse(x, id)))
-    );
-
-    const store = JSON.parse((await env.KV.get("byChannel")) || "{}");
-    results.forEach((r, i) => {
-      if (r.status === "fulfilled") store[batch[i]] = r.value;
-    });
-    for (const k of Object.keys(store)) if (!channels.includes(k)) delete store[k];
-
-    const videos = Object.values(store)
-      .flat()
-      .filter((v) => !v.isShort) // retirer cette ligne pour garder les Shorts
-      .sort((a, b) => b.published.localeCompare(a.published))
-      .slice(0, MAX_VIDEOS);
-
-    await env.KV.put("byChannel", JSON.stringify(store));
-    await env.KV.put("videos", JSON.stringify(videos));
   },
 };

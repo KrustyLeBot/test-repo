@@ -5,6 +5,3 @@ compatibility_date = "2026-10-01"
 # Pas d'id : Cloudflare crée le namespace KV tout seul au premier déploiement.
 [[kv_namespaces]]
 binding = "KV"
-
-[triggers]
-crons = ["*/30 * * * *"]
