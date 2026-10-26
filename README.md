@@ -38,7 +38,7 @@ Le repo est public, donc rien de personnel ne doit y figurer :
 | Token de l'URL de l'addon (`TOKEN`) | secret du Worker Cloudflare |
 | Vidéos récupérées | KV Cloudflare (privé) |
 
-Les logs de l'Action sont publics : le script n'y écrit que des totaux et masque les IDs de chaînes. N'y ajoute jamais de `console.log` d'ID ou de titre.
+Les handles et liens sont aussi dans le secret `CHANNELS`. Les logs de l'Action sont publics : le script n'y écrit que des totaux et masque les IDs de chaînes. N'y ajoute jamais de `console.log` d'ID ou de titre.
 
 ## Installation
 
@@ -54,7 +54,7 @@ Settings → Secrets and variables → Actions → New repository secret :
 
 | Nom | Valeur |
 |---|---|
-| `CHANNELS` | IDs de chaînes `UC...` séparés par des virgules, sans espace |
+| `CHANNELS` | chaînes séparées par des virgules ou des retours à la ligne : `@handle`, lien de chaîne (`https://www.youtube.com/@nom`) ou ID `UC...`. Les handles et liens sont convertis en ID par l'Action (résultat mis en cache dans le KV) |
 | `CF_ACCOUNT_ID` | Workers & Pages, colonne de droite |
 | `CF_KV_NAMESPACE_ID` | Storage & Databases → KV → ID du namespace |
 | `CF_API_TOKEN` | My Profile → API Tokens → Custom Token, permission *Account → Workers KV Storage → Edit* |
@@ -75,6 +75,7 @@ Modifier le secret `CHANNELS` dans GitHub (Settings → Secrets and variables �
 |---|---|
 | `Secret manquant : XXX` | secret absent ou mal nommé |
 | `HTTP 401/403` sur le KV | token Cloudflare faux ou sans permission *Workers KV Storage: Edit* |
+| `N non résolues` | handle ou lien introuvable (faute de frappe) ou page YouTube bloquée depuis GitHub : utiliser l'ID `UC...` à la place |
 | `0 ok` | YouTube refuse les requêtes depuis GitHub |
 | « Not found » dans le navigateur | token de l'URL différent du secret `TOKEN` |
 | Les Shorts apparaissent | YouTube bloque le test `/shorts/<id>` depuis GitHub |

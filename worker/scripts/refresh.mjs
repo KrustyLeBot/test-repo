@@ -19,8 +19,10 @@ for (const [k, v] of Object.entries({ CHANNELS, CF_ACCOUNT_ID, CF_KV_NAMESPACE_I
   if (!v) { console.error(`Secret manquant : ${k}`); process.exit(1); }
 }
 
-const channels = CHANNELS.split(/[,\s]+/).filter(Boolean);
-for (const id of channels) console.log(`::add-mask::${id}`);
+// CHANNELS accepte, séparés par virgules / espaces / retours à la ligne : des IDs (UC...),
+// des @handles, ou des liens de chaînes (youtube.com/@nom, /channel/UC..., /c/nom, /user/nom).
+const entries = CHANNELS.split(/[,\s]+/).filter(Boolean);
+for (const e of entries) console.log(`::add-mask::${e}`);
 
 const kvBase = `${CF_API}/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_KV_NAMESPACE_ID}`;
 const auth = { Authorization: `Bearer ${CF_API_TOKEN}` };
@@ -60,6 +62,56 @@ async function pool(items, fn) {
     while (i < items.length) await fn(items[i++]);
   }));
 }
+
+// --- Résolution des handles / liens en IDs de chaînes (résultat mis en cache dans la clé KV "resolved") ---
+const YT_BASE = process.env.YT_BASE || "https://www.youtube.com";
+const ID_ONLY = /^UC[\w-]{22}$/;
+
+function pageUrl(e) {
+  if (/^@/.test(e)) return `${YT_BASE}/${e}`;
+  if (/^https?:\/\//.test(e)) return /^https:\/\/((www|m)\.)?youtube\.com\//.test(e) ? e : null;
+  return `${YT_BASE}/@${e}`;
+}
+
+function extractChannelId(html) {
+  const patterns = [
+    /<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/,
+    /<meta itemprop="(?:channelId|identifier)" content="(UC[\w-]{22})"/,
+    /"externalId":"(UC[\w-]{22})"/,
+    /"channelId":"(UC[\w-]{22})"/,
+  ];
+  for (const re of patterns) { const m = html.match(re); if (m) return m[1]; }
+  return null;
+}
+
+const resolvedBefore = JSON.parse((await kvGet("resolved")) || "{}");
+const resolved = {};
+let unresolved = 0;
+await pool(entries, async (e) => {
+  if (ID_ONLY.test(e)) { resolved[e] = e; return; }
+  const direct = e.match(/\/channel\/(UC[\w-]{22})/);
+  if (direct) { resolved[e] = direct[1]; return; }
+  if (resolvedBefore[e]) { resolved[e] = resolvedBefore[e]; return; }
+  try {
+    const url = pageUrl(e);
+    if (!url) throw new Error("lien non YouTube");
+    const r = await fetch(url, { headers: {
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+      Cookie: "SOCS=CAI; CONSENT=YES+1",
+    } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const id = extractChannelId(await r.text());
+    if (!id) throw new Error("ID introuvable");
+    resolved[e] = id;
+  } catch {
+    unresolved++; // jamais d'entrée dans les logs : repo public
+  }
+});
+const channels = [...new Set(entries.map((e) => resolved[e]).filter(Boolean))]; // ordre stable
+for (const id of channels) console.log(`::add-mask::${id}`);
+console.log(`${entries.length} entrées : ${channels.length} chaînes, ${unresolved} non résolues`);
+if (JSON.stringify(entries.filter((e) => resolved[e]).map((e) => [e, resolved[e]])) !== JSON.stringify(Object.entries(resolvedBefore))) await kvPut("resolved", JSON.stringify(Object.fromEntries(entries.filter((e) => resolved[e]).map((e) => [e, resolved[e]]))));
 
 // État actuel du KV : clé -> texte JSON (sert à ne réécrire que ce qui change)
 const current = {};
@@ -125,8 +177,8 @@ for (const id of channels) {
   channelList.push({ id, name: names[id] || id, latest: vids[0].published, latestId: vids[0].id, count: vids.length });
   for (const v of vids.slice(0, 30)) latest.push({ ...v, channel: names[id] || id, channelId: id });
 }
-channelList.sort((a, b) => b.latest.localeCompare(a.latest));
-latest.sort((a, b) => b.published.localeCompare(a.published));
+channelList.sort((a, b) => b.latest.localeCompare(a.latest) || a.id.localeCompare(b.id));
+latest.sort((a, b) => b.published.localeCompare(a.published) || a.id.localeCompare(b.id) || a.channelId.localeCompare(b.channelId));
 
 const next = { videos: JSON.stringify(latest.slice(0, MAX_LATEST)), channels: JSON.stringify(channelList) };
 for (const id of channels) if (history[id]) next[`ch:${id}`] = JSON.stringify(history[id]);
