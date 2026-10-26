@@ -92,7 +92,3 @@ Edit the `config` KV key, then re-run the workflow or wait for the next schedule
 | No more updates | GitHub disables scheduled workflows after 60 days without repo activity: re-enable them in the Actions tab |
 
 The schedule is the `cron:` line in `.github/workflows/refresh.yml` (GitHub accepts 5 minutes at the minimum and often delays runs by a few minutes).
-
-## Renaming the repo
-
-GitHub redirects the old name. If Cloudflare stops deploying after a rename, reconnect the repo in Worker → Settings → Build. GitHub secrets stay in place. The Worker name (`wrangler.toml`) determines the `workers.dev` URL: do not change it without reinstalling the addon.
