@@ -69,6 +69,8 @@ Installer `https://yt-subs-addon.<compte>.workers.dev/<TOKEN>/manifest.json`.
 
 Le plus simple : la clé KV `config`, lisible et modifiable dans le dashboard Cloudflare (Storage & Databases → KV → ton namespace → KV Pairs → Add entry, clé `config`, valeur = la liste, une chaîne par ligne). Elle est prioritaire sur le secret `CHANNELS`. Les secrets GitHub sont en écriture seule : impossible de relire la liste pour la modifier.
 
+Le contenu du `subscriptions.csv` de Google Takeout (YouTube → abonnements) peut être collé tel quel dans cette clé : l'en-tête est ignoré et seule la première colonne (ID) est lue. On peut ajouter des `@handles` à la suite.
+
 Ensuite relancer le workflow à la main ou attendre 10 min. Une chaîne retirée disparaît du catalogue au passage suivant.
 
 ## Dépannage

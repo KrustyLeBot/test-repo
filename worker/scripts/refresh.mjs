@@ -61,7 +61,15 @@ async function pool(items, fn) {
 // Liste des chaînes : clé KV "config" (modifiable dans le dashboard Cloudflare), sinon secret CHANNELS.
 // Accepte, séparés par virgules / espaces / retours à la ligne : des IDs (UC...), des @handles,
 // ou des liens de chaînes (youtube.com/@nom, /channel/UC..., /c/nom, /user/nom).
-const entries = ((await kvGet("config")) ?? CHANNELS ?? "").split(/[,\s]+/).filter(Boolean);
+// Le CSV de Google Takeout (subscriptions.csv) peut être collé tel quel : on prend la 1re colonne (ID).
+const entries = ((await kvGet("config")) ?? CHANNELS ?? "")
+  .split(/\r?\n/)
+  .flatMap((line) => {
+    if (/^\s*channel[ _]?id\b/i.test(line)) return []; // ligne d'en-tête du CSV
+    const first = line.split(",")[0].trim();
+    if (/^UC[\w-]{22}$/.test(first)) return [first];
+    return line.split(/[,\s]+/).filter(Boolean);
+  });
 if (!entries.length) { console.error("Aucune chaîne : créer la clé KV « config » ou le secret CHANNELS."); process.exit(1); }
 for (const e of entries) console.log(`::add-mask::${e}`);
 
