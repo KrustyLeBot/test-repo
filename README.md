@@ -54,7 +54,7 @@ Settings → Secrets and variables → Actions → New repository secret :
 
 | Nom | Valeur |
 |---|---|
-| `CHANNELS` | chaînes séparées par des virgules ou des retours à la ligne : `@handle`, lien de chaîne (`https://www.youtube.com/@nom`) ou ID `UC...`. Les handles et liens sont convertis en ID par l'Action (résultat mis en cache dans le KV) |
+| `CHANNELS` (optionnel si la clé KV `config` existe) | chaînes séparées par des virgules ou des retours à la ligne : `@handle`, lien de chaîne (`https://www.youtube.com/@nom`) ou ID `UC...`. Les handles et liens sont convertis en ID par l'Action (résultat mis en cache dans le KV) |
 | `CF_ACCOUNT_ID` | Workers & Pages, colonne de droite |
 | `CF_KV_NAMESPACE_ID` | Storage & Databases → KV → ID du namespace |
 | `CF_API_TOKEN` | My Profile → API Tokens → Custom Token, permission *Account → Workers KV Storage → Edit* |
@@ -67,7 +67,9 @@ Installer `https://yt-subs-addon.<compte>.workers.dev/<TOKEN>/manifest.json`.
 
 ## Gérer les chaînes
 
-Modifier le secret `CHANNELS` dans GitHub (Settings → Secrets and variables → Actions), puis relancer le workflow à la main ou attendre 10 min. Une chaîne retirée disparaît du catalogue au passage suivant.
+Le plus simple : la clé KV `config`, lisible et modifiable dans le dashboard Cloudflare (Storage & Databases → KV → ton namespace → KV Pairs → Add entry, clé `config`, valeur = la liste, une chaîne par ligne). Elle est prioritaire sur le secret `CHANNELS`. Les secrets GitHub sont en écriture seule : impossible de relire la liste pour la modifier.
+
+Ensuite relancer le workflow à la main ou attendre 10 min. Une chaîne retirée disparaît du catalogue au passage suivant.
 
 ## Dépannage
 

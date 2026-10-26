@@ -15,14 +15,9 @@ const MAX_LATEST = 200;
 const MAX_PER_CHANNEL = 15;
 const CONCURRENCY = 10;
 
-for (const [k, v] of Object.entries({ CHANNELS, CF_ACCOUNT_ID, CF_KV_NAMESPACE_ID, CF_API_TOKEN })) {
+for (const [k, v] of Object.entries({ CF_ACCOUNT_ID, CF_KV_NAMESPACE_ID, CF_API_TOKEN })) {
   if (!v) { console.error(`Secret manquant : ${k}`); process.exit(1); }
 }
-
-// CHANNELS accepte, séparés par virgules / espaces / retours à la ligne : des IDs (UC...),
-// des @handles, ou des liens de chaînes (youtube.com/@nom, /channel/UC..., /c/nom, /user/nom).
-const entries = CHANNELS.split(/[,\s]+/).filter(Boolean);
-for (const e of entries) console.log(`::add-mask::${e}`);
 
 const kvBase = `${CF_API}/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_KV_NAMESPACE_ID}`;
 const auth = { Authorization: `Bearer ${CF_API_TOKEN}` };
@@ -62,6 +57,13 @@ async function pool(items, fn) {
     while (i < items.length) await fn(items[i++]);
   }));
 }
+
+// Liste des chaînes : clé KV "config" (modifiable dans le dashboard Cloudflare), sinon secret CHANNELS.
+// Accepte, séparés par virgules / espaces / retours à la ligne : des IDs (UC...), des @handles,
+// ou des liens de chaînes (youtube.com/@nom, /channel/UC..., /c/nom, /user/nom).
+const entries = ((await kvGet("config")) ?? CHANNELS ?? "").split(/[,\s]+/).filter(Boolean);
+if (!entries.length) { console.error("Aucune chaîne : créer la clé KV « config » ou le secret CHANNELS."); process.exit(1); }
+for (const e of entries) console.log(`::add-mask::${e}`);
 
 // --- Résolution des handles / liens en IDs de chaînes (résultat mis en cache dans la clé KV "resolved") ---
 const YT_BASE = process.env.YT_BASE || "https://www.youtube.com";
