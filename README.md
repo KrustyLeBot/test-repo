@@ -23,7 +23,7 @@ Deux catalogues :
 
 IDs : `yt_<videoId>` pour une vidéo, `ytch_<channelId>` pour une chaîne. Streams renvoyés : `ytId` (lecture dans Nuvio) et `externalUrl` (YouTube / NewPipe).
 
-Le flux RSS ne donne que les 15 dernières vidéos d'une chaîne : l'historique de chaque chaîne s'accumule au fil des exécutions (150 vidéos max par chaîne).
+Chaque chaîne garde ses 15 dernières vidéos (ce que donne le flux RSS), Shorts compris avant filtrage.
 
 Clés KV : `videos`, `channels`, `ch:<id>`. L'Action n'écrit que les clés qui ont changé (limite gratuite : 1 000 écritures/jour).
 

@@ -12,7 +12,7 @@ const FEED_BASE = process.env.FEED_BASE || "https://www.youtube.com/feeds/videos
 const SHORTS_BASE = process.env.SHORTS_BASE || "https://www.youtube.com/shorts/";
 const CF_API = process.env.CF_API_BASE || "https://api.cloudflare.com/client/v4";
 const MAX_LATEST = 200;
-const MAX_PER_CHANNEL = 150;
+const MAX_PER_CHANNEL = 15;
 const CONCURRENCY = 10;
 
 for (const [k, v] of Object.entries({ CHANNELS, CF_ACCOUNT_ID, CF_KV_NAMESPACE_ID, CF_API_TOKEN })) {
