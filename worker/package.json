@@ -1,0 +1,8 @@
+{
+  "name": "yt-subs-addon",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "4.151.3"
+  }
+}
