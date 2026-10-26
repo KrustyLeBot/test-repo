@@ -44,22 +44,18 @@ const channelMeta = (c) => ({
   releaseInfo: c.latest.slice(0, 10),
 });
 
-// Saison = année de publication, épisode = rang dans l'année (du plus ancien au plus récent)
+// Une seule saison ; épisode 1 = vidéo la plus récente. `released` garde la vraie date de publication.
 function episodes(vids) {
-  const asc = [...vids].sort((a, b) => a.published.localeCompare(b.published));
-  const perYear = {};
-  return asc.map((v) => {
-    const season = Number(v.published.slice(0, 4));
-    perYear[season] = (perYear[season] || 0) + 1;
-    return {
+  return [...vids]
+    .sort((a, b) => b.published.localeCompare(a.published))
+    .map((v, i) => ({
       id: `yt_${v.id}`,
       title: v.title,
       released: v.published,
-      season,
-      episode: perYear[season],
+      season: 1,
+      episode: i + 1,
       thumbnail: thumb(v.id),
-    };
-  });
+    }));
 }
 
 export default {

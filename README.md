@@ -19,7 +19,7 @@ GitHub Action (toutes les 10 min)          Cloudflare Worker (gratuit)          
 
 Deux catalogues :
 - **Dernières vidéos** (type `movie`) : les 200 dernières vidéos, toutes chaînes confondues.
-- **Chaînes** (type `series`) : une « série » par chaîne, triée par dernière publication. Les « épisodes » sont les vidéos de la chaîne, avec une saison par année.
+- **Chaînes** (type `series`) : une « série » par chaîne, triée par dernière publication. Les « épisodes » sont les vidéos de la chaîne : une seule saison, l'épisode 1 est la vidéo la plus récente (la vraie date de publication reste dans `released`).
 
 IDs : `yt_<videoId>` pour une vidéo, `ytch_<channelId>` pour une chaîne. Streams renvoyés : `ytId` (lecture dans Nuvio) et `externalUrl` (YouTube / NewPipe).
 
