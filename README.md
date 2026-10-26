@@ -17,7 +17,15 @@ GitHub Action (toutes les 10 min)          Cloudflare Worker (gratuit)          
 - `.github/workflows/refresh.yml` : planification de l'Action.
 - `worker/test/` : test du parsing (`node worker/test/parse.test.mjs`).
 
-Les IDs de vidéos sont de la forme `yt_<videoId>`. Les streams renvoyés sont `ytId` (lecture dans Nuvio) et `externalUrl` (ouverture dans YouTube / NewPipe).
+Deux catalogues :
+- **Dernières vidéos** (type `movie`) : les 200 dernières vidéos, toutes chaînes confondues.
+- **Chaînes** (type `series`) : une « série » par chaîne, triée par dernière publication. Les « épisodes » sont les vidéos de la chaîne, avec une saison par année.
+
+IDs : `yt_<videoId>` pour une vidéo, `ytch_<channelId>` pour une chaîne. Streams renvoyés : `ytId` (lecture dans Nuvio) et `externalUrl` (YouTube / NewPipe).
+
+Le flux RSS ne donne que les 15 dernières vidéos d'une chaîne : l'historique de chaque chaîne s'accumule au fil des exécutions (150 vidéos max par chaîne).
+
+Clés KV : `videos`, `channels`, `ch:<id>`. L'Action n'écrit que les clés qui ont changé (limite gratuite : 1 000 écritures/jour).
 
 ## Confidentialité
 
